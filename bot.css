@@ -1,0 +1,71 @@
+/* bot.css */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: white;   /* 회색 제거 */
+  height: 100%;
+}
+
+#app {
+  width: 100%;
+  max-width: 100%;
+  height: auto; /* 고정 높이 제거하고, 콘텐츠에 따라 늘어남 */
+  padding: 15px;
+  overflow-x: hidden;   /* 가로 스크롤 확실히 제거 */
+  overflow-y: auto;
+  word-wrap: break-word;
+  box-sizing: border-box; /* padding 포함한 크기로 계산 */
+}
+
+
+
+
+/*body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+  }
+  #app {
+    width: 100%;
+    height: 100%;
+    box-shadow: 0 0 8px rgba(0,0,0,0.2);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  #tab-menu {
+    display: flex;
+    background: #222;
+    color: #fff;
+  }
+  #tab-menu button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: #222;
+    color: #fff;
+    cursor: pointer;
+  }
+  #tab-menu button.active {
+    background: #444;
+  }
+  #content {
+    padding: 15px;
+    height: 420px;
+    overflow-y: auto;
+  }
+  .question {
+    padding: 8px 0;
+    cursor: pointer;
+    border-bottom: 1px solid #ddd;
+  }
+  .answer {
+    margin-top: 10px;
+  }
+  .back {
+    margin-bottom: 10px;
+    cursor: pointer;
+    color: blue;
+    text-decoration: underline;
+  }
+  */

@@ -1,0 +1,17 @@
+{
+    "manifest_version": 3,
+    "name": "내 챗봇 확장 프로그램",
+    "version": "1.0",
+    "description": "웹 우측 하단에 챗봇을 띄우는 크롬 확장",
+    "permissions": ["scripting", "activeTab"],
+    "host_permissions": ["<all_urls>"],
+    "web_accessible_resources": [{
+        "resources": ["bot.html", "bot.js", "bot.css", "data.js", "bot-icon.png"],
+        "matches": ["<all_urls>"]
+    }],
+    "content_scripts": [{
+        "matches": ["http://192.168.20.79/*"],
+        "js": ["content.js"]
+    }]
+}
+  
