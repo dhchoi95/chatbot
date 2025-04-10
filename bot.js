@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentCategory = null;
   let historyStack = [];
 
-  // 🔹 헤더 렌더링 (← 뒤로가기, X 닫기)
+  //뒤로가기, 닫기버튼
   function renderHeader({ showBack = false, backHandler = null }) {
     const oldHeader = document.getElementById("header-buttons");
     if (oldHeader) oldHeader.remove();
@@ -32,8 +32,8 @@ document.addEventListener("DOMContentLoaded", () => {
       back.title = "뒤로가기";
       Object.assign(back.style, {
         position: "absolute",
-        left: "3px",
-        top: "3px",
+        left: "2px",
+        top: "2px",
         background: "transparent",
         border: "none",
         fontWeight: "bold",
@@ -49,11 +49,11 @@ document.addEventListener("DOMContentLoaded", () => {
     close.title = "닫기";
     Object.assign(close.style, {
       position: "absolute",
-      right: "6px",
-      top: "6px",
+      right: "2px",
+      top: "2px",
       background: "transparent",
       border: "none",
-      fontSize: "12px",
+      fontSize: "14px",
       cursor: "pointer"
     });
     close.onclick = () => {
@@ -63,11 +63,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     container.appendChild(header);
   }
+  
 
   // 🔹 카테고리 목록 렌더링
   function renderCategories() {
     container.innerHTML = "<h3 style='font-size: 20px;'>VisualPro bot</h3>";
+
     renderHeader({ showBack: false });
+    renderReviewCheckButton();        // ✅ 그 다음 버튼 추가! (문의하기도 여기 쓰고 있으면 같이)
 
     chatbotData.forEach(cat => {
       const li = document.createElement("div");
@@ -371,6 +374,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  //검증검토 버튼
+  function renderReviewCheckButton() {
+    const reviewBtn = document.createElement("div");
+    reviewBtn.textContent = "검증검토";
+    Object.assign(reviewBtn.style, {
+      position: "absolute",
+      top: "2px",
+      right: "25px", // X버튼 왼쪽
+      backgroundColor: "#FFFFFF",
+      color: "black",
+      padding: "1px 1px",
+      borderRadius: "6px",
+      cursor: "pointer",
+      fontSize: "12px",
+      zIndex: "10000"
+    });
+  
+    reviewBtn.onclick = () => {
+      window.parent.postMessage({ action: "check-review-status" }, "*");
+    };
+  
+    container.appendChild(reviewBtn);
+  }
+
+  //문의하기 버튼
   function renderFeedbackButton() {
     const feedbackBtn = document.createElement("div");
     feedbackBtn.textContent = "문의하기";
