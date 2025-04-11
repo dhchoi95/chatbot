@@ -421,7 +421,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     container.appendChild(feedbackBtn);
   }
-
+  
   // 🔹 초기 실행
   searchInput.addEventListener("input", performSearch);
   searchBtn.addEventListener("click", performSearch);

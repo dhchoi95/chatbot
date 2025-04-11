@@ -1,4 +1,4 @@
-// ✅ 1. 챗봇 토글 버튼
+// ✅ 1. 챗봇 토글 버튼 생성 및 iframe 삽입
 if (!document.getElementById("my-chatbot-toggle")) {
   const button = document.createElement("div");
   button.id = "my-chatbot-toggle";
@@ -25,6 +25,8 @@ if (!document.getElementById("my-chatbot-toggle")) {
   document.body.appendChild(button);
 
   let iframe = null;
+
+  // 버튼 클릭 시 iframe 토글 (열기/닫기)
   button.onclick = () => {
     if (!iframe) {
       iframe = document.createElement("iframe");
@@ -47,6 +49,7 @@ if (!document.getElementById("my-chatbot-toggle")) {
     }
   };
 
+  // 챗봇 내부에서 'X' 누를 경우 iframe 제거
   window.addEventListener("message", (event) => {
     if (event.data.action === "close-chatbot") {
       const iframe = document.getElementById("my-chatbot-frame");
@@ -55,43 +58,57 @@ if (!document.getElementById("my-chatbot-toggle")) {
   });
 }
 
-// ✅ 2. 패널 탭 로딩 대기
+let isReviewRunning = false; // 검토 중 여부 상태
+
+// ✅ 2. 우측 패널 탭 로딩 대기
 function waitForPanelContent(maxWait = 3000, interval = 200) {
-  return new Promise(async (resolve) => {
+  return new Promise(async (resolve, reject) => {
     const maxTries = Math.ceil(maxWait / interval);
     for (let i = 0; i < maxTries; i++) {
       const tabs = Array.from(document.querySelectorAll(".right-collapse-title"));
       const bodies = Array.from(document.querySelectorAll(".el-collapse-item"));
-      const filled = bodies.some(body => body.textContent.trim().length > 0);
-      if (tabs.length > 0 && filled) {
+      const splitterVisible = Array.from(document.querySelectorAll(".splitpanes__splitter"))
+        .some(el => el.style.display === "block");
+
+      if (tabs.length > 0 && splitterVisible) {
+        console.log("✅ 우측 패널 로딩 완료 (splitter visible)");
         resolve({ tabs, bodies });
         return;
       }
+
       await new Promise(res => setTimeout(res, interval));
     }
-    resolve({ tabs: [], bodies: [] }); // 실패 시
+
+    // ❌ 실패 시 자동 중지 처리
+    console.warn("❌ 우측 패널 로딩 실패 (splitter 미표시)");
+    isReviewRunning = false;
+    document.getElementById("stop-review-btn")?.remove();
+    alert("❗ 우측 패널을 열고 다시 검증검토를 요청해주세요.");
+    reject(new Error("우측 패널 로딩 실패"));
   });
 }
 
-// ✅ 3. 단일 h3에 대한 상태 확인
+
+
+
+// ✅ 3. 개별 항목(h3)에 대한 상태 확인 함수
 async function checkReviewStatusByH3(h3) {
   h3.scrollIntoView({ behavior: "auto", block: "center" });
   h3.click();
 
-  const { tabs, bodies } = await waitForPanelContent();
-  if (bodies.length === 0) {
-    console.warn("⚠️ 패널 본문 로딩 실패:", h3.textContent.trim());
+  const result = await waitForPanelContent();
+  const tabs = result?.tabs ?? [];
+  const bodies = result?.bodies ?? [];
+
+  if (!tabs.length || !bodies.length) {
+    console.warn("⚠️ 우측 패널 내용 부족 (탭 or 바디 없음)", h3.textContent.trim());
     return { commentCount: -1, reviewCount: -1 };
   }
 
-  const reviewTab = tabs.find(tab => tab.textContent.includes("검증검토"));
-  if (reviewTab && !reviewTab.classList.contains("active")) {
-    reviewTab.click();
-    await new Promise(res => setTimeout(res, 2000));
-  }
-
+  await new Promise(res => setTimeout(res, 1000));
   let commentCount = 0;
   let reviewCount = 0;
+
   tabs.forEach(tab => {
     const text = tab.textContent;
     if (text.includes("댓글")) {
@@ -107,41 +124,32 @@ async function checkReviewStatusByH3(h3) {
   return { commentCount, reviewCount };
 }
 
-// ✅ 4. 본문 h3에 상태 표시
-async function markReviewStatusOnH3() {
-  const h3List = Array.from(document.querySelectorAll("h3"))
-    .filter(h3 => !h3.classList.contains("workitem-name"));
 
-  for (const h3 of h3List) {
-    const { commentCount, reviewCount } = await checkReviewStatusByH3(h3);
 
-    const existing = h3.querySelector(".review-status");
-    if (existing) existing.remove();
+// ✅ 4. 전체 목차 항목에 대한 상태 표시
+async function markReviewStatusOnTreeViewOnly() {
+  const allItems = Array.from(document.querySelectorAll("#documentTreeviewId li .k-in"));
 
-    const span = document.createElement("span");
-    span.className = "review-status";
-    Object.assign(span.style, {
-      marginLeft: "10px",
-      fontSize: "0.9em",
-      color: "#888"
-    });
-    span.textContent = `💬 ${commentCount} | ✅ ${reviewCount}`;
-    h3.appendChild(span);
-  }
-}
+  // 현재 선택된 항목 찾기
+  const selectedItem = document.querySelector("#documentTreeviewId li[aria-selected='true'] .k-in");
+  
+  // 선택된 항목의 인덱스 찾기
+  const startIndex = allItems.findIndex(item => item === selectedItem);
+  
+  // 이후 항목만 추출 (선택된 항목 포함)
+  const treeItems = allItems.slice(startIndex);  
+  isReviewRunning = true;
 
-// ✅ 5. 목차 항목 옆 상태 표시
-async function markReviewStatusOnTreeView() {
-  const treeItems = document.querySelectorAll("#documentTreeviewId li .k-in");
   for (const item of treeItems) {
-    const titleText = item.textContent.trim().replace(/\[\d+\]/g, "").trim();
-    const matchingH3 = Array.from(document.querySelectorAll("h3"))
-      .find(h3 => h3.textContent.trim() === titleText && !h3.classList.contains("workitem-name"));
+    if (!isReviewRunning) break;
 
-    if (!matchingH3) continue;
+    //forceOpenRightPanelIfNeeded();  // 우측 패널 열기 시도
+    item.scrollIntoView({ behavior: "auto", block: "center" });
+    item.click();
 
-    const { commentCount, reviewCount } = await checkReviewStatusByH3(matchingH3);
+    const { commentCount, reviewCount } = await checkReviewStatusByH3(item);
 
+    // 기존 상태 제거 후 다시 추가
     const existing = item.querySelector(".tree-status");
     if (existing) existing.remove();
 
@@ -155,12 +163,64 @@ async function markReviewStatusOnTreeView() {
     span.textContent = `💬 ${commentCount} | ✅ ${reviewCount}`;
     item.appendChild(span);
   }
+
+  isReviewRunning = false;
+}
+/*
+// ✅ 5. 우측 패널이 닫혀 있을 경우 강제로 열기
+async function forceOpenRightPanelIfNeeded() {
+  //const tabs = document.querySelectorAll(".right-collapse-title");
+  //if (tabs.length === 0) {
+    const headerToClick = document.querySelector("header.el-header.doc-header");
+    if (headerToClick) {
+      headerToClick.scrollIntoView({ behavior: "auto", block: "center" });
+      headerToClick.click();
+      console.log("✅ 헤더 클릭으로 탭 강제 오픈 시도");
+      await new Promise(res => setTimeout(res, 2000)); // ⏱️ 2초 대기
+    }
+  //}
+}
+*/
+
+// ✅ 6. 중지 버튼 생성 함수
+function createStopButton() {
+  if (document.getElementById("stop-review-btn")) return;
+
+  const stopBtn = document.createElement("div");
+  stopBtn.id = "stop-review-btn";
+  stopBtn.textContent = "⏹ 중지";
+  Object.assign(stopBtn.style, {
+    position: "fixed",
+    bottom: "570px",
+    right: "95px",
+    backgroundColor: "#ffdddd",
+    color: "#000",
+    padding: "4px 10px",
+    borderRadius: "8px",
+    fontSize: "13px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    zIndex: "99999"
+  });
+
+  stopBtn.onclick = () => {
+    isReviewRunning = false;
+    stopBtn.remove();
+    alert("⛔ 검증검토가 중지되었습니다.");
+  };
+
+  document.body.appendChild(stopBtn);
 }
 
-// ✅ 6. 챗봇 메시지 수신 (트리거)
-window.addEventListener("message", (event) => {
+// ✅ 7. 챗봇으로부터 메시지 수신 시 검토 시작 트리거
+window.addEventListener("message", async (event) => {
   if (event.data.action === "check-review-status") {
-    markReviewStatusOnH3();
-    markReviewStatusOnTreeView();
+    if (!isReviewRunning) {
+      isReviewRunning = true;
+      createStopButton();
+      await markReviewStatusOnTreeViewOnly();
+      document.getElementById("stop-review-btn")?.remove();
+      isReviewRunning = false;
+    }
   }
 });
