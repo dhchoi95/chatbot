@@ -249,31 +249,31 @@ const chatbotData = [
       items: [
         {
           question:"APACHE_U",
-          //answer: "",
+          answer: "다른 프로젝트를 보고싶다면 아래 버튼을 눌러주세요",
           link: "http://192.168.20.79/#/project/329/workitem/dashboard",
           linkTitle: "APACHE_U 프로젝트"
         },
         {
           question:"APACHE_U2",
-          //answer: "",
+          answer: "다른 프로젝트를 보고싶다면 아래 버튼을 눌러주세요",
           link: "http://192.168.20.79/#/project/485/workitem/dashboard",
           linkTitle: "APACHE_U2 프로젝트"
         },
         {
           question:"AURORA1_TX",
-          //answer: "",
+          answer: "다른 프로젝트를 보고싶다면 아래 버튼을 눌러주세요",
           link: "http://192.168.20.79/#/project/450/workitem/dashboard",
           linkTitle: "AURORA1_TX 프로젝트"
         },
         {
           question:"AURORA1_RX",
-          //answer: "",
+          answer: "다른 프로젝트를 보고싶다면 아래 버튼을 눌러주세요",
           link: "http://192.168.20.79/#/project/484/workitem/dashboard",
           linkTitle: "AURORA1_RX 프로젝트"
         },
         {
           question:"APACHE6",
-          //answer: "",
+          answer: "다른 프로젝트를 보고싶다면 아래 버튼을 눌러주세요",
           link: "http://192.168.20.79/#/project/366/workitem/dashboard",
           linkTitle: "APACHE6 프로젝트"
         }

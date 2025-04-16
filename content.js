@@ -26,12 +26,13 @@ if (!document.getElementById("my-chatbot-toggle")) {
 
   let iframe = null;
 
-  // 버튼 클릭 시 iframe 토글 (열기/닫기)
+  // ✅ 챗봇 토글 버튼 클릭 시 iframe 열기/닫기
   button.onclick = () => {
     if (!iframe) {
       iframe = document.createElement("iframe");
       iframe.src = chrome.runtime.getURL("bot.html");
       iframe.id = "my-chatbot-frame";
+
       Object.assign(iframe.style, {
         position: "fixed",
         bottom: "60px",
@@ -42,14 +43,26 @@ if (!document.getElementById("my-chatbot-toggle")) {
         borderRadius: "10px",
         zIndex: "9999"
       });
+
       document.body.appendChild(iframe);
+
+      // ✅ iframe 로드 완료 시 사용자 이름 전달
+      iframe.addEventListener("load", () => {
+        const userEl = document.querySelector(".user-name");
+        if (userEl && iframe?.contentWindow) {
+          const username = userEl.textContent.trim().replace(/\s+/g, "");
+          iframe.contentWindow.postMessage({ action: "send-username", username }, "*");
+        }
+      });
+
     } else {
+      // 이미 열려있으면 제거
       iframe.remove();
       iframe = null;
     }
   };
 
-  // 챗봇 내부에서 'X' 누를 경우 iframe 제거
+  // ✅ 챗봇 내부에서 'X' 누르면 iframe 제거
   window.addEventListener("message", (event) => {
     if (event.data.action === "close-chatbot") {
       const iframe = document.getElementById("my-chatbot-frame");
@@ -58,12 +71,13 @@ if (!document.getElementById("my-chatbot-toggle")) {
   });
 }
 
-let isReviewRunning = false; // 검토 중 여부 상태
+let isReviewRunning = false; // ✅ 검증검토 진행 중 여부
 
 // ✅ 2. 우측 패널 탭 로딩 대기
 function waitForPanelContent(maxWait = 3000, interval = 200) {
   return new Promise(async (resolve, reject) => {
     const maxTries = Math.ceil(maxWait / interval);
+
     for (let i = 0; i < maxTries; i++) {
       const tabs = Array.from(document.querySelectorAll(".right-collapse-title"));
       const bodies = Array.from(document.querySelectorAll(".el-col"));
@@ -71,8 +85,7 @@ function waitForPanelContent(maxWait = 3000, interval = 200) {
         .some(el => el.style.display === "block");
 
       if (tabs.length > 0 && splitterVisible) {
-        console.log("✅ 우측 패널 로딩 완료 (splitter visible)");
-        await new Promise(res => setTimeout(res, 1000)); // ✅ 1초 대기 추가
+        await new Promise(res => setTimeout(res, 1000));
         resolve({ tabs, bodies });
         return;
       }
@@ -80,8 +93,7 @@ function waitForPanelContent(maxWait = 3000, interval = 200) {
       await new Promise(res => setTimeout(res, interval));
     }
 
-    // ❌ 실패 시 자동 중지 처리
-    console.warn("❌ 우측 패널 로딩 실패 (splitter 미표시)");
+    console.warn("❌ 우측 패널 로딩 실패");
     isReviewRunning = false;
     document.getElementById("stop-review-btn")?.remove();
     alert("❗ 우측 패널을 열고 다시 검증검토를 요청해주세요.");
@@ -89,15 +101,13 @@ function waitForPanelContent(maxWait = 3000, interval = 200) {
   });
 }
 
-
-
-
-// ✅ 3. 개별 항목(item)에 대한 상태 확인 함수
+// ✅ 3. 개별 항목(item)의 상태 확인
 async function checkReviewStatusByItem(item) {
   item.scrollIntoView({ behavior: "auto", block: "center" });
   item.click();
+
   const allHeaders = Array.from(document.querySelectorAll("header.doc-header h3"));
-  const target = allHeaders.find(titletext => titletext.textContent.trim() === item.textContent.trim());
+  const target = allHeaders.find(title => title.textContent.trim() === item.textContent.trim());
 
   if (target) {
     target.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -106,39 +116,30 @@ async function checkReviewStatusByItem(item) {
 
   const result = await waitForPanelContent();
   const tabs = result?.tabs ?? [];
-  
-  const matched = await waitForMatchingBody(item); // ✨ await 꼭 필요!
-  await new Promise(res => setTimeout(res,1100)); // ✅ 1.1초 대기 추가
 
-  if (!matched) {
-    console.warn("본문 일치 실패");
-  }
+  const matched = await waitForMatchingBody(item);
+  await new Promise(res => setTimeout(res, 1100));
+
   let commentCount = 0;
   let reviewCount = 0;
 
   tabs.forEach(tab => {
     const text = tab.textContent;
-    if (text.includes("댓글")) {
-      const match = text.match(/\d+/);
-      if (match) commentCount = parseInt(match[0]);
-    }
-    if (text.includes("검증검토")) {
-      const match = text.match(/\d+/);
-      if (match) reviewCount = parseInt(match[0]);
-    }
+    const match = text.match(/\d+/);
+    if (text.includes("댓글") && match) commentCount = parseInt(match[0]);
+    if (text.includes("검증검토") && match) reviewCount = parseInt(match[0]);
   });
 
   return { commentCount, reviewCount };
 }
 
-// 패널 로딩 후, 텍스트 일치할 때까지 기다리는 함수 (번호/코드 제거 버전)
+// ✅ 4. 본문 일치 여부 확인 (번호/코드 제거 후 비교)
 async function waitForMatchingBody(item, maxWait = 5000, interval = 200) {
-  // 🔹 번호와 대괄호 제거 + 공백 제거
-  const normalize = (text) =>
+  const normalize = text =>
     text
-      .replace(/^\d+(\.\d+)*\.?/, "")// 예: 1. 또는 1.2. 또는 1.2.3. 제거
-      .replace(/\[.*?\]/g, "")       // [코드] 제거
-      .replace(/\s+/g, "");          // 모든 공백 제거
+      .replace(/^\d+(\.\d+)*\.?/, "") // 숫자 제거 (1., 1.2. 등)
+      .replace(/\[.*?\]/g, "")        // 대괄호 제거
+      .replace(/\s+/g, "");           // 공백 제거
 
   const targetText = normalize(item.textContent);
 
@@ -147,37 +148,30 @@ async function waitForMatchingBody(item, maxWait = 5000, interval = 200) {
     const bodies = Array.from(document.querySelectorAll(".el-col"));
     for (const body of bodies) {
       const bodyText = normalize(body.textContent);
-      if (bodyText === targetText) {
-        return true;
-      }
+      if (bodyText === targetText) return true;
     }
     await new Promise(res => setTimeout(res, interval));
   }
-  return false; // 최종 실패
+  return false;
 }
 
-
-
-
-// ✅ 4. 전체 목차 항목에 대한 상태 표시
+// ✅ 5. 전체 항목에 상태 표시
 async function markReviewStatusOnTreeViewOnly() {
   const allItems = Array.from(document.querySelectorAll("#documentTreeviewId li .k-in"));
-  const selectedItem = document.querySelector("#documentTreeviewId li[aria-selected='true'] .k-in");//현재 선택된 항목 찾기
-  const startIndex = allItems.findIndex(item => item === selectedItem); // 선택된 항목의 인덱스 찾기
-  const treeItems = allItems.slice(startIndex); //이후 항목만 추출 (선택된 항목 포함)
+  const selectedItem = document.querySelector("#documentTreeviewId li[aria-selected='true'] .k-in");
+  const startIndex = allItems.findIndex(item => item === selectedItem);
+  const treeItems = allItems.slice(startIndex);
 
   isReviewRunning = true;
 
   for (const item of treeItems) {
     if (!isReviewRunning) break;
 
-    //forceOpenRightPanelIfNeeded();  // 우측 패널 열기 시도
     item.scrollIntoView({ behavior: "auto", block: "center" });
     item.click();
 
     const { commentCount, reviewCount } = await checkReviewStatusByItem(item);
 
-    // 기존 상태 제거 후 다시 추가
     const existing = item.querySelector(".tree-status");
     if (existing) existing.remove();
 
@@ -195,28 +189,25 @@ async function markReviewStatusOnTreeViewOnly() {
   isReviewRunning = false;
 }
 
-// ✅ 5. 우측 패널이 닫혀 있을 경우 강제로 열기
-async function forceOpenRightPanelIfNeeded(startIndex) {
-  //const tabs = document.querySelectorAll(".right-collapse-title");
-  //if (tabs.length === 0) {
-    const headerToClick = document.querySelector("header.el-header.doc-header");
-    if (headerToClick) {
-      headerToClick.scrollIntoView({ behavior: "auto", block: "center" });
-      headerToClick.click();
-      console.log("✅ 헤더 클릭으로 탭 강제 오픈 시도");
-      await new Promise(res => setTimeout(res, 2000)); // ⏱️ 2초 대기
-    }
-  //}
+// ✅ 6. 검증검토 강제 패널 오픈
+async function forceOpenRightPanelIfNeeded() {
+  const headerToClick = document.querySelector("header.el-header.doc-header");
+  if (headerToClick) {
+    headerToClick.scrollIntoView({ behavior: "auto", block: "center" });
+    headerToClick.click();
+    console.log("✅ 헤더 클릭으로 강제 패널 오픈");
+    await new Promise(res => setTimeout(res, 2000));
+  }
 }
 
-
-// ✅ 6. 중지 버튼 생성 함수
+// ✅ 7. 중지 버튼 생성
 function createStopButton() {
   if (document.getElementById("stop-review-btn")) return;
 
   const stopBtn = document.createElement("div");
   stopBtn.id = "stop-review-btn";
   stopBtn.textContent = "⏹ 중지";
+
   Object.assign(stopBtn.style, {
     position: "fixed",
     bottom: "570px",
@@ -240,15 +231,63 @@ function createStopButton() {
   document.body.appendChild(stopBtn);
 }
 
-// ✅ 7. 챗봇으로부터 메시지 수신 시 검토 시작 트리거
+// ✅ 8. 챗봇에서 메시지 수신 시 검증검토 실행
 window.addEventListener("message", async (event) => {
-  if (event.data.action === "check-review-status") {
-    if (!isReviewRunning) {
-      isReviewRunning = true;
-      createStopButton();
-      await markReviewStatusOnTreeViewOnly();
-      document.getElementById("stop-review-btn")?.remove();
-      isReviewRunning = false;
+  if (event.data.action === "check-review-status" && !isReviewRunning) {
+    isReviewRunning = true;
+    createStopButton();
+    await markReviewStatusOnTreeViewOnly();
+    document.getElementById("stop-review-btn")?.remove();
+    isReviewRunning = false;
+  }
+});
+
+//문의하기 기능 조작
+window.addEventListener("message", async (event) => {
+  if (event.data.action === "inject-feedback") {
+    console.log("되나");
+    const content = event.data.content;
+
+    // "추가" 버튼을 기다렸다가 누름
+    const waitForButton = async () => {
+      const maxWait = 10000;
+      const interval = 300;
+      const end = Date.now() + maxWait;
+
+      while (Date.now() < end) {
+        const spans = Array.from(document.querySelectorAll("button span"));
+        const addBtnSpan = spans.find(span => span.textContent.trim() === "추가");
+        if (addBtnSpan) {
+          const btn = addBtnSpan.closest("button");
+          if (btn) {
+            btn.click();
+            break;
+          }
+        }
+        await new Promise(r => setTimeout(r, interval));
+      }
+    };
+
+    const waitForEditor = async () => {
+      const maxWait = 10000;
+      const interval = 300;
+      const end = Date.now() + maxWait;
+
+      while (Date.now() < end) {
+        const editor = document.querySelector('div[role="textbox"][contenteditable="true"]');
+        if (editor) return editor;
+        await new Promise(r => setTimeout(r, interval));
+      }
+      return null;
+    };
+
+    await waitForButton();
+    const editor = await waitForEditor();
+    if (editor) {
+      editor.focus();
+      editor.innerHTML = `<p>${content.replace(/"/g, '&quot;')}</p>`;
     }
   }
 });
+
+

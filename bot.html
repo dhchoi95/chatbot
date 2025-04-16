@@ -2,16 +2,47 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>My Chatbot</title>
+  <title>카카오톡 챗봇</title>
   <link rel="stylesheet" href="bot.css" />
 </head>
 <body>
-  <body>
-    <div id="app">
-      <div id="tab-menu"></div>
-      <div id="content"></div>
+  <div id="chatbot">
+    <!-- 상단 고정 메뉴 -->
+    <div class="top-bar">
+      <div class="left-buttons">
+        <div id="feedback-btn" class="top-btn">문의하기</div>
+        <div id="feedback-popup">
+          <label><b>문의 카테고리</b></label><br>
+          <label><input type="radio" name="feedback-type" value="bug" checked> 오류 / 버그</label>
+          <label><input type="radio" name="feedback-type" value="improve"> 개선 요청</label>
+        
+          <br><br>
+          <!--<textarea id="feedback-text" rows="6" style="width: 100%;" placeholder="내용을 입력하세요"></textarea>-->
+          <button id="submit-feedback-btn" style="margin-top: 10px;">이동</button>
+        </div>        
+        <div id="back-btn" class="top-btn">초기화</div>
+      </div>
+      <div class="right-buttons">
+        <div id="review-btn" class="top-btn">검증검토</div>
+        <div id="close-btn" class="top-btn">X</div>
+      </div>
     </div>
 
+    <!-- 대화창 -->
+    <div id="chat-window"></div>
+
+    <!-- 입력창 -->
+    <div id="input-area">
+      <input type="text" id="user-input" placeholder="메시지를 입력하세요..." />
+      <button id="send-btn">전송</button>
+    </div>
+  </div>
+
+  <!-- 문의하기 팝업 -->
+  <div id="feedback-popup">
+    <textarea id="feedback-text" placeholder="문의 내용을 입력하세요 (Enter로 전송)"></textarea>
+  </div>
+  <script src="lang.js"></script>
   <script src="data.js"></script>
   <script src="bot.js"></script>
 </body>

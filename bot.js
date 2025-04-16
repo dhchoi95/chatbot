@@ -1,431 +1,284 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // 🔹 초기 셋업
-  const app = document.getElementById("app");
-  const container = document.createElement("div");
-  Object.assign(container.style, {
-    fontFamily: "Arial, sans-serif",
-    color: "#000000",
-    backgroundColor: "#ffffff",
-    position: "relative",
-    height: "100%",
-    padding: "0.5rem",
-    paddingBottom: "60px",
-    boxSizing: "border-box",
-    overflowY: "auto"
-  });
-  app.appendChild(container);
+  // ✅ 주요 DOM 요소 초기화
+  const chatWindow = document.getElementById("chat-window");
+  const input = document.getElementById("user-input");
+  const sendBtn = document.getElementById("send-btn");
 
-  let currentCategory = null;
-  let historyStack = [];
+  const feedbackBtn = document.getElementById("feedback-btn");
+  const backBtn = document.getElementById("back-btn");
+  const reviewBtn = document.getElementById("review-btn");
+  const closeBtn = document.getElementById("close-btn");
+  const feedbackPopup = document.getElementById("feedback-popup");
 
-  //뒤로가기, 닫기버튼
-  function renderHeader({ showBack = false, backHandler = null }) {
-    const oldHeader = document.getElementById("header-buttons");
-    if (oldHeader) oldHeader.remove();
+  // ✅ 뒤로가기 이력 저장용 스택
+  const historyStack = [];
 
-    const header = document.createElement("div");
-    header.id = "header-buttons";
+  // ✅ 사용자 이름 기본값 (콘텐츠에서 받아올 때 갱신됨)
+  let username = "사용자";
 
-    if (showBack) {
-      const back = document.createElement("button");
-      back.textContent = "←";
-      back.title = "뒤로가기";
-      Object.assign(back.style, {
-        position: "absolute",
-        left: "2px",
-        top: "2px",
-        background: "transparent",
-        border: "none",
-        fontWeight: "bold",
-        fontSize: "20px",
-        cursor: "pointer"
-      });
-      back.onclick = backHandler;
-      header.appendChild(back);
+  // ✅ 콘텐츠 영역(content.js)에서 사용자 이름 수신
+  window.addEventListener("message", (event) => {
+    if (event.data.action === "send-username") {
+      username = event.data.username;
+      clearChat();  // 이름을 받은 후 챗봇 초기화
     }
+  });
 
-    const close = document.createElement("button");
-    close.textContent = "X";
-    close.title = "닫기";
-    Object.assign(close.style, {
-      position: "absolute",
-      right: "2px",
-      top: "2px",
-      background: "transparent",
-      border: "none",
-      fontSize: "14px",
-      cursor: "pointer"
+  // ✅ 채팅창 맨 아래로 스크롤
+  const scrollToBottom = () => {
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  };
+
+  // ✅ 채팅 전체 초기화 후 인사말 표시
+  const clearChat = () => {
+    chatWindow.innerHTML = "";
+    showGreeting();
+  };
+
+  // ✅ 메시지를 출력하는 함수 (로딩 후 표시)
+  const showMessage = (message, isUser = false) => {
+    return new Promise(resolve => {
+      if (isUser) {
+        // 사용자 말풍선
+        const userBubble = document.createElement("div");
+        userBubble.className = "user-bubble";
+        userBubble.innerHTML = message;
+        chatWindow.appendChild(userBubble);
+        scrollToBottom();
+        return resolve();
+      }
+
+      // 챗봇 로딩 말풍선 (... 표시)
+      const loadingBubble = document.createElement("div");
+      loadingBubble.className = "bot-bubble loading";
+      loadingBubble.textContent = "...";
+      chatWindow.appendChild(loadingBubble);
+      scrollToBottom();
+
+      // 0.8초 후 실제 챗봇 메시지 출력
+      setTimeout(() => {
+        loadingBubble.remove();
+
+        const finalBubble = document.createElement("div");
+        finalBubble.className = "bot-bubble";
+        finalBubble.innerHTML = message.replace(/\n/g, "<br/>");
+        chatWindow.appendChild(finalBubble);
+        scrollToBottom();
+        resolve();
+      }, 800);
     });
-    close.onclick = () => {
-      window.parent.postMessage({ action: "close-chatbot" }, "*");
-    };
-    header.appendChild(close);
+  };
 
-    container.appendChild(header);
-  }
+  // ✅ 버튼 그룹 출력 함수
+  const showButtons = (options, callback, isFinal = false) => {
+    return new Promise(resolve => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "bot-bubble";
+      wrapper.style.display = "flex";
+      wrapper.style.flexDirection = "column";
+      wrapper.style.gap = "6px";
   
-
-  // 🔹 카테고리 목록 렌더링
-  function renderCategories() {
-    container.innerHTML = "<h3 style='font-size: 20px;'>VisualPro bot</h3>";
-
-    renderHeader({ showBack: false });
-    renderReviewCheckButton();        // ✅ 그 다음 버튼 추가! (문의하기도 여기 쓰고 있으면 같이)
-
-    chatbotData.forEach(cat => {
-      const li = document.createElement("div");
-      li.textContent = cat.category;
-      Object.assign(li.style, {
-        cursor: "pointer",
-        marginBottom: "0.5rem",
-        padding: "0.5rem",
-        fontSize: "18px"
-      });
-      li.onclick = () => {
-        currentCategory = cat;
-        historyStack = [];
-        historyStack.push(() => renderCategories());
-        renderItemList(cat.items, cat.category);
-      };
-      container.appendChild(li);
-    });
-  }
-
-  // 🔹 카테고리별 질문 리스트 렌더링
-  function renderItemList(items, title) {
-    container.innerHTML = `<h3 style="font-size: 17px;">${title}</h3>`;
-    renderHeader({
-      showBack: historyStack.length > 0,
-      backHandler: () => {
-        const previous = historyStack.pop();
-        if (typeof previous === 'function') previous();
-      }
-    });
-
-    items.forEach(item => {
-      const li = document.createElement("div");
-      li.textContent = item.question;
-      Object.assign(li.style, {
-        cursor: "pointer",
-        marginBottom: "0.5rem",
-        padding: "0.4rem",
-        fontSize: "16px"
-      });
-      li.onclick = () => {
-        historyStack.push(() => renderItemList(items, title));
-        historyStack.push(() => renderQA(item));
-        renderQA(item);
-      };
-      container.appendChild(li);
-    });
-  }
-
-  // 🔹 상세 설명 렌더링
-  function renderDetail(detailText, parentNode) {
-    container.innerHTML = `<h4 style="font-size: 16px;"><b>자세한 설명</b></h4>`;
-    renderHeader({
-      showBack: true,
-      backHandler: () => renderQA(parentNode)
-    });
-    const detail = document.createElement("p");
-    detail.innerHTML = detailText;
-    detail.style.fontSize = "16px";
-    container.appendChild(detail);
-  }
-
-  // 🔹 Q&A 렌더링
-  function renderQA(node) {
-    container.innerHTML = `<h4 style="font-size: 16px;"><b>Q. ${node.question || "질문 없음"}</b></h4>`;
-    renderHeader({
-      showBack: historyStack.length > 0,
-      backHandler: () => {
-        const previous = historyStack.pop();
-        if (typeof previous === 'function') previous();
-      }
-    });
-
-    if (typeof node.answer === "string") {
-      const p = document.createElement("p");
-      p.innerHTML = `<b>A.</b> ${node.answer}`;
-      p.style.fontSize = "16px";
-      container.appendChild(p);
-    } else if (Array.isArray(node.answer)) {
-      node.answer.forEach(sub => {
-        const li = document.createElement("div");
-        li.textContent = sub.question || "(하위 질문 없음)";
-        Object.assign(li.style, {
-          cursor: "pointer",
-          marginBottom: "0.5rem",
-          fontSize: "16px"
-        });
-        li.onclick = () => {
-          historyStack.push(() => renderQA(node));
-          renderQA(sub);
+      options.forEach(opt => {
+        const btn = document.createElement("button");
+        btn.textContent = opt;
+        btn.className = "option-btn";
+        btn.onclick = () => {
+          callback(opt);
+          resolve();
         };
-        container.appendChild(li);
+        wrapper.appendChild(btn);
       });
-    } else if (typeof node.answer === "object" && node.answer !== null) {
-      const sub = node.answer;
-      const li = document.createElement("div");
-      li.textContent = sub.question || "(하위 질문 없음)";
-      Object.assign(li.style, {
-        cursor: "pointer",
-        marginBottom: "0.5rem",
-        fontSize: "16px"
-      });
-      li.onclick = () => {
-        historyStack.push(() => renderQA(node));
-        renderQA(sub);
-      };
-      container.appendChild(li);
-    }
-
-    // 🔸 상세 설명 버튼 + 링크 버튼
-    if (node.detail) {
-      const toggle = document.createElement("button");
-      let expanded = false;
-      const detailTitle = node.detailTitle || "자세한 설명 보기 ▼";
-      toggle.textContent = detailTitle;
-      Object.assign(toggle.style, {
-        marginTop: "1rem",
-        padding: "0.5rem 1rem",
-        backgroundColor: "#28a745",
-        color: "white",
-        border: "none",
-        borderRadius: "4px",
-        fontSize: "14px",
-        cursor: "pointer"
-      });
-
-      const detailBox = document.createElement("div");
-      detailBox.style.display = "none";
-      detailBox.style.marginTop = "0.5rem";
-      detailBox.innerHTML = `<p style="font-size: 14px;">${node.detail}</p>`;
-
-      if (node.link) {
-        const linkBtn = document.createElement("button");
-        linkBtn.textContent = node.linkTitle || "자세한 내용 보기";
-        Object.assign(linkBtn.style, {
-          marginTop: "0.5rem",
-          padding: "0.3rem 0.8rem",
-          backgroundColor: "#007bff",
-          color: "white",
-          border: "none",
-          borderRadius: "4px",
-          fontSize: "13px",
-          cursor: "pointer"
-        });
-        linkBtn.onclick = () => window.open(node.link, "_blank");
-        detailBox.appendChild(linkBtn);
+  
+      if (!isFinal) {
+        const fallbackBtn = document.createElement("button");
+        fallbackBtn.textContent = lang.labels.fallback;
+        fallbackBtn.className = "option-btn";
+        fallbackBtn.onclick = () => {
+          clearChat();
+          resolve();
+        };
+        wrapper.appendChild(fallbackBtn);
       }
-
-      toggle.onclick = () => {
-        expanded = !expanded;
-        toggle.textContent = expanded
-          ? detailTitle.replace("보기", "닫기")
-          : detailTitle;
-        detailBox.style.display = expanded ? "block" : "none";
-      };
-
-      container.appendChild(toggle);
-      container.appendChild(detailBox);
-    } else if (node.link) {
-      const detailBtn = document.createElement("button");
-      detailBtn.textContent = node.linkTitle || "자세한 내용 보기";
-      Object.assign(detailBtn.style, {
-        marginTop: "1rem",
-        padding: "0.5rem 1rem",
-        backgroundColor: "#007bff",
-        color: "white",
-        border: "none",
-        borderRadius: "4px",
-        fontSize: "14px",
-        cursor: "pointer"
-      });
-      detailBtn.onclick = () => window.open(node.link, "_blank");
-      container.appendChild(detailBtn);
-    }
-  }
-
-  // 🔹 검색창 + 버튼 UI
-  const searchBox = document.createElement("div");
-  Object.assign(searchBox.style, {
-    position: "fixed",
-    bottom: "0",
-    left: "0",
-    width: "100%",
-    boxSizing: "border-box",
-    padding: "8px",
-    background: "white",
-    borderTop: "1px solid #ccc",
-    zIndex: "9999"
-  });
-  searchBox.innerHTML = `
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <input type="text" id="search-input" placeholder="검색어를 입력하세요..." style="flex: 1; padding: 8px; font-size: 14px; border: 1px solid #ddd; border-radius: 4px;">
-      <button id="search-btn" style="padding: 8px 12px; font-size: 14px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">🔍</button>
-    </div>
-    <div id="search-results" style="margin-top: 8px;"></div>
-  `;
-  document.body.appendChild(searchBox);
-
-  // 🔹 문의하기 팝업 UI
-  const feedbackPopup = document.createElement("div");
-  Object.assign(feedbackPopup.style, {
-    position: "fixed",
-    top: "100px",
-    left: "20px",
-    width: "300px",
-    backgroundColor: "#f8f9fa",
-    padding: "16px",
-    borderRadius: "8px",
-    border: "1px solid #ccc",
-    zIndex: "9999",
-    display: "none"
-  });
-  feedbackPopup.innerHTML = `
-    <div style="font-weight:bold; margin-bottom:8px;">VisualPro bot 문의사항을 남겨주세요.</div>
-    <textarea id="feedback-text" rows="4" style="width:100%; padding:6px; font-size:14px; resize: none;"></textarea>
-    <p style="font-size: 12px; color: #888; margin-top: 6px;">Enter 키로 전송됩니다.<br/>문의하기 기능은 구현중입니다. 직접 문의해주세요.</p>
-  `;
-  document.body.appendChild(feedbackPopup);
-
-  document.addEventListener("keydown", e => {
-    const feedbackInput = document.getElementById("feedback-text");
-    if (feedbackInput && document.activeElement === feedbackInput && e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      const message = feedbackInput.value.trim();
-      if (message) {
-        alert("✅ 전송됨: " + message);
-        feedbackInput.value = "";
-        feedbackPopup.style.display = "none";
-      }
-    }
-  });
-
-  // 🔹 실시간 검색
-  const searchInput = document.getElementById("search-input");
-  const searchBtn = document.getElementById("search-btn");
-
-  function highlightText(text, keyword) {
-    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${escaped})`, "gi");
-    return text.replace(regex, `<mark>$1</mark>`);
-  }
-
-  function renderSearchResults(results) {
-    container.innerHTML = "<h3 style='font-size: 17px;'>검색 결과</h3>";
-    renderHeader({ showBack: true, backHandler: () => renderCategories() });
-    results.slice(0, 10).forEach(({ item, highlighted }) => {
-      const li = document.createElement("div");
-      li.innerHTML = highlighted;
-      Object.assign(li.style, {
-        cursor: "pointer",
-        marginBottom: "0.5rem",
-        padding: "0.4rem",
-        fontSize: "16px"
-      });
-      li.onclick = () => {
-        historyStack.push(() => renderSearchResults(results));
-        renderQA(item);
-      };
-      container.appendChild(li);
+  
+      chatWindow.appendChild(wrapper);
+      scrollToBottom();
     });
-  }
+  };
 
-  function performSearch() {
-    const keyword = searchInput.value.trim().toLowerCase();
-    if (!keyword) {
-      renderCategories();
-      return;
+  // ✅ 인사말 메시지 + 카테고리 버튼 표시
+  const showGreeting = async () => {
+    const greetingFormat = lang.greetingFormat;
+    const randomFollowup = lang.greetingMessages[Math.floor(Math.random() * lang.greetingMessages.length)];
+    const greeting = greetingFormat.replace("{username}", username);
+    await showMessage(`${greeting} ${randomFollowup}`);
+
+    const categories = chatbotData.map(cat => cat.category);
+    await showButtons(categories, (selectedCategory) => {
+      const cat = chatbotData.find(c => c.category === selectedCategory);
+      if (cat) {
+        showMessage(selectedCategory, true);
+        historyStack.push(() => showGreeting());
+        showQuestions(cat.items);
+      }
+    }, true); // 첫 화면에는 fallback 제외
+  };
+
+  // ✅ 질문 리스트 표시
+  const showQuestions = async(items) => {
+    const questions = items.map(i => i.question);
+    await showMessage(lang.labels.subQuestionPrompt);
+    await showButtons(questions, (selectedQ) => {
+      const item = items.find(i => i.question === selectedQ);
+      if (item) showUserAndBot(item.question, item);
+    });
+  };
+
+  // ✅ 질문과 응답 흐름 처리
+  const showUserAndBot = async (question, item) => {
+    await showMessage(question, true);  // 사용자 입력 출력
+    await handleAnswer(item);          // 챗봇 응답 처리
+  };
+
+  // ✅ 응답 처리: 일반 텍스트 또는 하위 질문
+  const handleAnswer = async (item) => {
+    if (typeof item.answer === "string") {
+      await showMessage(`<b>A.</b> ${item.answer}`);
+      if (item.link) showLink(item.link, item.linkTitle);
+    } else if (Array.isArray(item.answer)) {
+      await showMessage(lang.labels.subQuestionPrompt);
+      await showButtons(item.answer.map(sub => sub.question), async (selectedQ) => {
+        const sub = item.answer.find(a => a.question === selectedQ);
+        if (sub) await showUserAndBot(sub.question, sub);
+      }, false);
     }
+  };
 
-    const keywords = keyword.split(/\s+/);
-    let results = [];
+  // ✅ 링크 버튼 생성
+  const showLink = (url, title = lang.labels.defaultLinkTitle) => {
+    const linkBtn = document.createElement("button");
+    linkBtn.textContent = title;
+    linkBtn.className = "link-btn";
+    linkBtn.onclick = () => window.open(url, "_blank");
+    chatWindow.appendChild(linkBtn);
+    scrollToBottom();
+  };
+
+  // ✅ 유사 질문 탐색 (하위 질문 포함)
+  const findSimilarQuestions = (input) => {
+    const results = [];
 
     chatbotData.forEach(cat => {
       cat.items.forEach(item => {
-        const questionText = item.question || "";
-        const answerText = typeof item.answer === "string" ? item.answer : "";
-        const combinedText = (questionText + " " + answerText).toLowerCase();
+        // 최상위 질문/답변 점수 계산
+        const combined = item.question + " " + (typeof item.answer === "string" ? item.answer : "");
+        const score = inputScore(input, combined);
+        results.push({ item, score });
 
-        let score = 0;
-        keywords.forEach(word => {
-          score += (combinedText.split(word).length - 1);
-        });
+        // 하위 answer가 배열이면 그 안도 유사도 비교
+        if (Array.isArray(item.answer)) {
+          item.answer.forEach(sub => {
+            const subCombined = sub.question + " " + (typeof sub.answer === "string" ? sub.answer : "");
+            const subScore = inputScore(input, subCombined);
 
-        if (score > 0) {
-          let highlighted = questionText;
-          keywords.forEach(word => {
-            const regex = new RegExp(`(${word})`, "gi");
-            highlighted = highlighted.replace(regex, `<mark>$1</mark>`);
+            // 하위 질문도 하나의 항목처럼 다룬다
+            results.push({ item: sub, score: subScore });
           });
-
-          results.push({ item, score, highlighted });
         }
       });
     });
 
     results.sort((a, b) => b.score - a.score);
-    if (results.length > 0) {
-      renderSearchResults(results);
-    } else {
-      container.innerHTML = "<p style='padding:1rem; font-size:16px;'>검색 결과가 없습니다.</p>";
+    return results.slice(0, 3).map(r => r.item);
+  };
+
+  // ✅ 유사도 점수 계산 (문자열 포함 여부 + 유사 키워드 수)
+  const inputScore = (input, text) => {
+    const normalizedInput = input.toLowerCase();
+    const normalizedText = text.toLowerCase();
+    return normalizedText.includes(normalizedInput) ? 100 : similarity(normalizedInput, normalizedText);
+  };
+
+  // ✅ 단순 키워드 일치 수를 기반으로 유사도 측정
+  const similarity = (a, b) => {
+    let match = 0;
+    a.split(" ").forEach(word => {
+      if (b.includes(word)) match++;
+    });
+    return match;
+  };
+
+  // ✅ 사용자 직접 입력 시 처리 흐름
+  const handleFreeInput = async (text) => {
+    await showMessage(text, true);  // 사용자 입력 출력
+    const suggestions = findSimilarQuestions(text);
+    if (suggestions.length === 0) {
+      await showMessage(lang.labels.noResult);
+      return;
     }
-  }
 
-  //검증검토 버튼
-  function renderReviewCheckButton() {
-    const reviewBtn = document.createElement("div");
-    reviewBtn.textContent = "검증검토";
-    Object.assign(reviewBtn.style, {
-      position: "absolute",
-      top: "2px",
-      right: "25px", // X버튼 왼쪽
-      backgroundColor: "#FFFFFF",
-      color: "black",
-      padding: "1px 1px",
-      borderRadius: "6px",
-      cursor: "pointer",
-      fontSize: "12px",
-      zIndex: "10000"
+    await showMessage(lang.labels.suggestionPrompt);
+    await showButtons(suggestions.map(s => s.question), (selected) => {
+      const item = suggestions.find(s => s.question === selected);
+      if (item) showUserAndBot(item.question, item);
+    });
+  };
+
+  // ✅ 전송 버튼 클릭 시 입력 처리
+  sendBtn.onclick = () => {
+    const value = input.value.trim();
+    if (value) {
+      handleFreeInput(value);
+      input.value = "";
+    }
+  };
+
+  // ✅ Enter 키 입력 시 전송
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendBtn.click();
+  });
+
+  // ✅ 상단 버튼 기능 설정
+  feedbackBtn.onclick = () => {
+    feedbackPopup.style.display = feedbackPopup.style.display === "none" ? "block" : "none";
+  };
+  backBtn.onclick = () => {
+    clearChat(); // 초기화
+  };
+  reviewBtn.onclick = () => {
+    window.parent.postMessage({ action: "check-review-status" }, "*");
+  };
+  closeBtn.onclick = () => {
+    window.parent.postMessage({ action: "close-chatbot" }, "*");
+  };
+
+
+  // 문의하기 기능
+  document.getElementById("submit-feedback-btn").addEventListener("click", async () => {
+    const type = document.querySelector('input[name="feedback-type"]:checked').value;
+    //const content = document.getElementById("feedback-text").value.trim();
+  
+    //if (!content) return alert("내용을 입력해주세요.");
+  
+    //const confirmSend = confirm("제출하시겠습니까?");
+    const confirmSend = confirm("이동 하시겠습니까?");
+    if (!confirmSend) return;
+  
+    const targetUrl = type === "bug"
+      ? "http://192.168.20.79/#/project/431/workitem/12763/list"
+      : "http://192.168.20.79/#/project/431/workitem/20615/list";
+  
+    // 새 탭으로 VisualPro 문서 열기
+    const win = window.open(targetUrl, "_blank");
+  
+    console.log("ddd");
+    // 메세지 전달 방식 사용 필요
+    win.addEventListener("load", () => {
+      win.postMessage({ action: "inject-feedback", content, type }, "*");
     });
   
-    reviewBtn.onclick = () => {
-      window.parent.postMessage({ action: "check-review-status" }, "*");
-    };
+    // 팝업 닫기 및 내용 초기화
+    document.getElementById("feedback-popup").style.display = "none";
+    document.getElementById("feedback-text").value = "";
+  });
   
-    container.appendChild(reviewBtn);
-  }
-
-  //문의하기 버튼
-  function renderFeedbackButton() {
-    const feedbackBtn = document.createElement("div");
-    feedbackBtn.textContent = "문의하기";
-    Object.assign(feedbackBtn.style, {
-      position: "absolute",
-      top: "2px",
-      left: "5px",
-      backgroundColor: "#FFFFFF",
-      color: "black",
-      padding: "1px 1px",
-      borderRadius: "6px",
-      cursor: "pointer",
-      fontSize: "12px",
-      zIndex: "10000"
-    });
-
-    feedbackBtn.onclick = () => {
-      feedbackPopup.style.display = feedbackPopup.style.display === "none" ? "block" : "none";
-    };
-
-    container.appendChild(feedbackBtn);
-  }
-  
-  // 🔹 초기 실행
-  searchInput.addEventListener("input", performSearch);
-  searchBtn.addEventListener("click", performSearch);
-
-  renderCategories();
-  renderFeedbackButton();
 });
